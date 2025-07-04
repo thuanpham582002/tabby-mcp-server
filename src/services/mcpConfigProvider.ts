@@ -20,7 +20,18 @@ export class McpConfigProvider extends ConfigProvider {
         enabled: false,
         autoFocusTerminal: true,
         showConfirmationDialog: true,
-        showResultDialog: true
+        showResultDialog: true,
+        requireRetype: false,
+        retypeMode: 'partial',
+        retypeThreshold: 10,
+        allowRetypeBypass: true,
+        bypassAfterAttempts: 2,
+        bypassRequiresConfirmation: true,
+        enableCharacterHighlighting: true,
+        caseInsensitiveMatching: false,
+        showTypingMetrics: true,
+        enableTypingSpeed: false,
+        enableTabAutoCompletion: true
       }
     },
     hotkeys: {

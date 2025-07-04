@@ -129,3 +129,164 @@
         i.fas.fa-save.mr-1
         span Save
     .text-muted Show a dialog with command results after execution
+
+  h4.mt-4(*ngIf='pairProgrammingEnabled && showConfirmationDialog') Retype Functionality
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog')
+    label Require Retype
+    .d-flex
+      toggle(
+        [(ngModel)]='requireRetype',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleRequireRetype()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Require typing part of the command to confirm execution (muscle memory training)
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Retype Mode
+    .d-flex
+      select.form-control.mr-2(
+        [(ngModel)]='retypeMode',
+        (change)='updateRetypeMode()'
+      )
+        option(value='partial') Partial - Type first N characters
+        option(value='full') Full - Type entire command
+        option(value='keywords') Keywords - Type key command parts
+      button.btn.btn-secondary(
+        (click)='updateRetypeMode()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Choose how much of the command needs to be retyped
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype && retypeMode === "partial"')
+    label Retype Threshold (Characters)
+    .d-flex
+      input.form-control.mr-2(
+        type='number',
+        [(ngModel)]='retypeThreshold',
+        min='1',
+        max='100',
+        (change)='updateRetypeThreshold()'
+      )
+      button.btn.btn-secondary(
+        (click)='updateRetypeThreshold()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Number of characters to type when using partial mode
+
+  h5.mt-4(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype') Bypass Options
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Allow Retype Bypass
+    .d-flex
+      toggle(
+        [(ngModel)]='allowRetypeBypass',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleAllowRetypeBypass()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Allow users to bypass retype validation after failed attempts
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype && allowRetypeBypass')
+    label Bypass After Attempts
+    .d-flex
+      input.form-control.mr-2(
+        type='number',
+        [(ngModel)]='bypassAfterAttempts',
+        min='1',
+        max='10',
+        (change)='updateBypassAfterAttempts()'
+      )
+      button.btn.btn-secondary(
+        (click)='updateBypassAfterAttempts()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Number of failed attempts before showing bypass option
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype && allowRetypeBypass')
+    label Bypass Requires Confirmation
+    .d-flex
+      toggle(
+        [(ngModel)]='bypassRequiresConfirmation',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleBypassRequiresConfirmation()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Require additional confirmation when bypassing retype validation
+
+  h5.mt-4(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype') Visual Enhancements
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Character-by-Character Highlighting
+    .d-flex
+      toggle(
+        [(ngModel)]='enableCharacterHighlighting',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleEnableCharacterHighlighting()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Highlight correct characters in green and incorrect in red as you type
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Case Insensitive Matching
+    .d-flex
+      toggle(
+        [(ngModel)]='caseInsensitiveMatching',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleCaseInsensitiveMatching()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Allow uppercase/lowercase variations (e.g., 'Git' matches 'git')
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Show Typing Metrics
+    .d-flex
+      toggle(
+        [(ngModel)]='showTypingMetrics',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleShowTypingMetrics()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Display detailed progress indicators and character-level feedback
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Enable Typing Speed Tracking
+    .d-flex
+      toggle(
+        [(ngModel)]='enableTypingSpeed',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleEnableTypingSpeed()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Track and display typing speed (characters per minute)
+
+  .form-group(*ngIf='pairProgrammingEnabled && showConfirmationDialog && requireRetype')
+    label Enable Tab Auto-Completion
+    .d-flex
+      toggle(
+        [(ngModel)]='enableTabAutoCompletion',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleEnableTabAutoCompletion()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Allow Tab key to auto-complete commands while maintaining muscle memory training
