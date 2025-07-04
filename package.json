@@ -38,6 +38,7 @@
     "tabby-terminal": "*"
   },
   "devDependencies": {
-    "strip-ansi": "^7.1.0"
+    "strip-ansi": "^7.1.0",
+    "typescript": "^5.8.3"
   }
 }

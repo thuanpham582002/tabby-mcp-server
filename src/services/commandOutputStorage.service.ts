@@ -8,7 +8,7 @@ export interface StoredCommandOutput {
   id: string;
   command: string;
   output: string;
-  promptShell: string | null;
+  promptShell: string | null; // keeping for backward compatibility with stored data
   exitCode: number | null;
   timestamp: number;
   aborted: boolean;

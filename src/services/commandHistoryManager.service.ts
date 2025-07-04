@@ -9,7 +9,7 @@ export interface CommandHistoryEntry {
   id: string;
   command: string;
   output: string;
-  promptShell: string | null;
+  dir: string | null; // current working directory where command was executed
   exitCode: number | null;
   timestamp: number;
   aborted: boolean;
@@ -327,7 +327,6 @@ export class CommandHistoryManagerService {
       const status = entry.aborted ? '⚠️ ABORTED' : (entry.exitCode === 0 ? '✅ SUCCESS' : '❌ FAILED');
       const duration = entry.duration ? ` (${this.formatDuration(entry.duration)})` : '';
       
-      mdLines.push(`## Command ${index + 1}`);
       mdLines.push(`**Date:** ${timestamp}`);
       mdLines.push(`**Status:** ${status}${duration}`);
       if (entry.tabTitle) {
@@ -335,14 +334,12 @@ export class CommandHistoryManagerService {
       }
       mdLines.push(`**Exit Code:** ${entry.exitCode !== null ? entry.exitCode : 'N/A'}`);
       mdLines.push('');
-      mdLines.push('### Command');
       mdLines.push('```bash');
       mdLines.push(entry.command);
       mdLines.push('```');
       mdLines.push('');
       
       if (entry.output && entry.output.trim()) {
-        mdLines.push('### Output');
         mdLines.push('```');
         mdLines.push(entry.output.trim());
         mdLines.push('```');

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import stripAnsi from 'strip-ansi';
-import { createErrorResponse, createJsonResponse } from '../../type/types';
+import { createErrorResponse, StructuredResponseBuilder } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
@@ -21,39 +21,7 @@ export class GetTerminalBufferTool extends BaseTool {
   getTool() {
     return {
       name: 'get_terminal_buffer',
-      description: `Retrieves the current content (text buffer) of a terminal session with options to specify line ranges.
-
-USE CASES:
-- Check the current state of a terminal
-- Analyze command output after execution
-- Verify if a command completed successfully
-- Extract information from the terminal display
-
-LIMITATIONS:
-- Maximum of 200 lines can be retrieved at once
-- ANSI color codes and formatting are stripped from the output
-- Very long lines may be wrapped or truncated by the terminal
-
-RETURNS:
-{
-  "lines": ["line1", "line2", ...], // Array of text lines from the terminal
-  "totalLines": 500, // Total number of lines in the buffer
-  "startLine": 1, // The starting line number requested
-  "endLine": 200 // The ending line number returned
-}
-
-RELATED TOOLS:
-- get_ssh_session_list: Find available terminal sessions
-- exec_command: Execute commands in a terminal
-
-EXAMPLE USAGE:
-1. Get all terminal sessions: get_ssh_session_list()
-2. Get the last 50 lines: get_terminal_buffer({ tabId: "0", startLine: 1, endLine: 50 })
-3. Get lines 100-200: get_terminal_buffer({ tabId: "0", startLine: 100, endLine: 200 })
-
-POSSIBLE ERRORS:
-- "No terminal session found with ID {tabId}" - Use get_ssh_session_list to find valid IDs
-- "Failed to get terminal buffer" - The terminal may be in an invalid state`,
+      description: `Retrieves the current text content from a terminal session buffer with optional line range specification. Returns organized sections with buffer information and content.`,
       schema: {
         tabId: z.string().describe('The ID of the terminal tab to get the buffer from. Get available IDs by calling get_ssh_session_list first. Example: "0" or "1".'),
 
@@ -105,12 +73,19 @@ POSSIBLE ERRORS:
           // Extract the requested lines
           const requestedLines = lines.slice(end, start);
 
-          return createJsonResponse({
-            lines: requestedLines,
-            totalLines,
-            startLine,
-            endLine: endLine === -1 ? Math.min(startLine + this.MAX_LINES - 1, totalLines) : endLine
-          });
+          // Build structured response
+          const actualEndLine = endLine === -1 ? Math.min(startLine + this.MAX_LINES - 1, totalLines) : endLine;
+
+          const bufferInfo =
+            `totalLines is ${totalLines}\n` +
+            `startLine is ${startLine}\n` +
+            `endLine is ${actualEndLine}\n` +
+            `retrieved ${requestedLines.length} lines`;
+
+          return new StructuredResponseBuilder()
+            .addSection("Terminal Buffer Information", bufferInfo)
+            .addSection("Terminal Buffer Content", requestedLines.join('\n'))
+            .build();
         } catch (err) {
           this.logger.error(`Error getting terminal buffer:`, err);
           return createErrorResponse(`Failed to get terminal buffer: ${err.message || err}`);

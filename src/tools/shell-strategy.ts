@@ -162,15 +162,15 @@ export class ShellContext {
     const shType = new ShShellStrategy().getShellType();
     const unknownType = new UnknownShellStrategy().getShellType();
 
-    return `if [ -n "$BASH_VERSION" ]; then echo "SHELL_TYPE=${bashType}"; elif [ -n "$ZSH_VERSION" ]; then echo "SHELL_TYPE=${zshType}"; elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then echo "SHELL_TYPE=${shType}"; else echo "SHELL_TYPE=${unknownType}"; fi`;
+    return `if [ -n "$BASH_VERSION" ]; then echo "SHELL_TYPE=${bashType}"; elif [ -n "$ZSH_VERSION" ]; then echo "SHELL_TYPE=${zshType}"; elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then echo "SHELL_TYPE=${shType}"; else echo "SHELL_TYPE=${unknownType}"; fi; echo "PWD_PATH=$(pwd)"`;
   }
 
   /**
-   * Detect shell type from terminal output
-   * @param terminalOutput The terminal output containing shell type
-   * @returns The detected shell type
+   * Detect shell type and current working directory from terminal output
+   * @param terminalOutput The terminal output containing shell type and pwd
+   * @returns Object with detected shell type and current working directory, or null if detection fails
    */
-  detectShellType(terminalOutput: string): string | null {
+  detectShellType(terminalOutput: string): { shellType: string; currentWorkingDirectory: string } | null {
     try {
       if (!terminalOutput || typeof terminalOutput !== 'string') {
         console.warn('[DEBUG] Invalid terminal output provided for shell detection');
@@ -178,31 +178,41 @@ export class ShellContext {
       }
 
       const lines = stripAnsi(terminalOutput).split('\n');
-      
+
       if (!lines || lines.length === 0) {
         console.warn('[DEBUG] No lines found in terminal output');
         return null;
       }
 
-      // Check the last 3 lines for SHELL_TYPE= pattern
-      for (let i = Math.max(0, lines.length - 3); i < lines.length; i++) {
+      let shellType: string | null = null;
+      let currentWorkingDirectory: string | null = null;
+
+      // Check the last 5 lines for SHELL_TYPE= and PWD_PATH= patterns
+      for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
         const line = lines[i];
         if (line && line.startsWith('SHELL_TYPE=')) {
           const parts = line.split('=');
           if (parts.length >= 2) {
-            const shellType = parts[1].trim();
-            if (shellType) {
-              console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
-              return shellType;
-            }
+            shellType = parts[1].trim();
+            console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
+          }
+        } else if (line && line.startsWith('PWD_PATH=')) {
+          const parts = line.split('=');
+          if (parts.length >= 2) {
+            currentWorkingDirectory = parts[1].trim();
+            console.log(`[DEBUG] Raw detected pwd: "${currentWorkingDirectory}"`);
           }
         }
       }
 
-      console.warn('[DEBUG] No SHELL_TYPE= pattern found in terminal output');
+      if (shellType && currentWorkingDirectory) {
+        return { shellType, currentWorkingDirectory };
+      }
+
+      console.warn('[DEBUG] Missing SHELL_TYPE or PWD_PATH pattern in terminal output');
       return null;
     } catch (error) {
-      console.error('[DEBUG] Error detecting shell type:', error);
+      console.error('[DEBUG] Error detecting shell type and pwd:', error);
       return null;
     }
   }

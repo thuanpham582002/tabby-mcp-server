@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { createErrorResponse, createJsonResponse } from '../../type/types';
+import { createErrorResponse, StructuredResponseBuilder } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { McpLoggerService } from '../../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
@@ -24,48 +24,7 @@ export class GetCommandOutputTool extends BaseTool {
   getTool() {
     return {
       name: 'get_command_output',
-      description: `Retrieves the full or paginated output of a previously executed command using its outputId.
-
-USE CASES:
-- Get the complete output of a command that was truncated
-- Retrieve specific portions of a long command output
-- Access historical command results
-
-LIMITATIONS:
-- The outputId must be from a recent command execution
-- Maximum of 250 lines can be retrieved in a single request
-- Command output is stored temporarily and may be lost after session restart
-
-RETURNS:
-{
-  "command": "original command text",
-  "output": "paginated command output text",
-  "promptShell": "shell prompt (e.g., user@host:~$)",
-  "exitCode": 0, // Command exit code
-  "aborted": false, // Whether the command was aborted
-  "pagination": {
-    "startLine": 1, // Starting line of this page
-    "endLine": 250, // Ending line of this page
-    "totalLines": 1000, // Total lines in the complete output
-    "part": 1, // Current page number
-    "totalParts": 4, // Total number of pages
-    "maxLines": 250 // Maximum lines per page
-  }
-}
-
-RELATED TOOLS:
-- exec_command: Execute commands and get outputId
-- get_ssh_session_list: Find available terminal sessions
-
-EXAMPLE USAGE:
-1. Execute a command: result = exec_command({ command: "find / -name '*.log'" })
-2. If output is truncated, get the outputId from the result
-3. Get the first page: get_command_output({ outputId: "abc123", startLine: 1, maxLines: 250 })
-4. Get the next page: get_command_output({ outputId: "abc123", startLine: 251, maxLines: 250 })
-
-POSSIBLE ERRORS:
-- "Command output with ID {outputId} not found" - The outputId is invalid or expired
-- "Failed to retrieve command output" - An error occurred while retrieving the output`,
+      description: `Retrieves stored command output using an outputId from previous executions. Returns organized sections with command information, output content, and pagination details when applicable.`,
       schema: {
         outputId: z.string().describe('The unique ID of the stored command output to retrieve. This ID is returned by the exec_command tool when a command has been executed. Example: "cmd_1234567890".'),
 
@@ -93,28 +52,28 @@ POSSIBLE ERRORS:
           // Format the output
           const { lines, totalLines, part, totalParts, command, exitCode, promptShell, aborted } = paginatedOutput;
 
-          // Add pagination info to the output if there are multiple parts
-          let outputText = lines.join('\n');
+          // Build structured response using the builder pattern
+          const builder = new StructuredResponseBuilder()
+            .addSection("Command Information",
+              `command is ${command}\n` +
+              `exitCode is ${exitCode ?? 'unknown'}\n` +
+              `aborted is ${aborted}\n` +
+              `directory where command executed is ${promptShell || 'unknown'}`
+            )
+            .addSection("Command Output", lines.join('\n'));
+
+          // Add pagination information if there are multiple parts
           if (totalParts > 1) {
-            outputText += `\n\n[Showing part ${part}/${totalParts} (lines ${startLine}-${Math.min(startLine + lines.length - 1, totalLines)} of ${totalLines})]`;
-            outputText += `\nTo see other parts, use startLine parameter (e.g., startLine: ${startLine + maxLines})`;
+            const paginationInfo =
+              `showing part ${part} of ${totalParts}\n` +
+              `lines ${startLine} to ${Math.min(startLine + lines.length - 1, totalLines)} of ${totalLines} total lines\n` +
+              `maxLines per page is ${maxLines}\n` +
+              `to see next part use startLine ${startLine + maxLines}`;
+
+            builder.addSection("Pagination Information", paginationInfo);
           }
 
-          return createJsonResponse({
-            command,
-            output: outputText,
-            promptShell,
-            exitCode,
-            aborted,
-            pagination: {
-              startLine,
-              endLine: Math.min(startLine + lines.length - 1, totalLines),
-              totalLines,
-              part,
-              totalParts,
-              maxLines
-            }
-          });
+          return builder.build();
         } catch (err) {
           this.logger.error(`Error retrieving command output:`, err);
           return createErrorResponse(`Failed to retrieve command output: ${err.message || err}`);
