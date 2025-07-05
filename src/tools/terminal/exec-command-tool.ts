@@ -207,7 +207,7 @@ ${trimmedCommand}\n`);
 
       let attempts = 0;
       const maxAttempts = 50;
-      let shellDetectionResult: { shellType: string; currentWorkingDirectory: string } | null = null;
+      let shellDetectionResult: { shellType: string; currentWorkingDirectory: string; systemInfo?: string } | null = null;
 
       while (shellDetectionResult === null && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -217,7 +217,7 @@ ${trimmedCommand}\n`);
         // Determine shell type and current working directory from output
         shellDetectionResult = this.execToolCategory.shellContext.detectShellType(textAfterSetup);
         attempts++;
-        this.logger.info(`Shell detection attempt ${attempts}: ${shellDetectionResult ? `${shellDetectionResult.shellType} in ${shellDetectionResult.currentWorkingDirectory}` : 'null'}`);
+        this.logger.info(`Shell detection attempt ${attempts}: ${shellDetectionResult ? `${shellDetectionResult.shellType} in ${shellDetectionResult.currentWorkingDirectory}${shellDetectionResult.systemInfo ? ` (${shellDetectionResult.systemInfo})` : ''}` : 'null'}`);
       }
 
       if (shellDetectionResult === null) {
@@ -226,7 +226,7 @@ ${trimmedCommand}\n`);
           return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
         } else {
           this.logger.error(`Failed to detect shell type after ${maxAttempts} attempts, aborting command`);
-          await this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled); // Cancel command, do not return anything
+          await this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled, undefined, undefined); // Cancel command, do not return anything
           const duration = Date.now() - executionStartTime;
           const executionResults = `duration is ${duration} milliseconds\naborted is true`;
           const commandOutput = `Command did not start after ${maxAttempts} attempts, aborting command, maybe it got error on escape sequence.`;
@@ -235,8 +235,8 @@ ${trimmedCommand}\n`);
         }
       }
 
-      // Extract shell type and current working directory
-      const { shellType, currentWorkingDirectory } = shellDetectionResult;
+      // Extract shell type, current working directory, and system information
+      const { shellType, currentWorkingDirectory, systemInfo } = shellDetectionResult;
 
       // Get the appropriate shell strategy
       const shellStrategy = this.execToolCategory.shellContext.getStrategy(shellType ?? 'unknown');
@@ -302,7 +302,7 @@ ${trimmedCommand}\n`);
       }
 
       if (aborted) {
-        return this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled, currentWorkingDirectory);
+        return this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled, currentWorkingDirectory, systemInfo);
       }
 
       // Check if command execution failed and should retry
@@ -325,7 +325,7 @@ ${trimmedCommand}\n`);
 
       this.logger.info(`Command executed successfully: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
 
-      return this.handleSuccessfulCommand(command, output, currentWorkingDirectory, exitCode, session, executionStartTime, pairProgrammingEnabled);
+      return this.handleSuccessfulCommand(command, output, currentWorkingDirectory, exitCode, session, executionStartTime, pairProgrammingEnabled, systemInfo);
 
     } catch (error) {
       // Clear active command on error
@@ -360,7 +360,8 @@ ${trimmedCommand}\n`);
     startMarker: string,
     executionStartTime: number,
     pairProgrammingEnabled: boolean,
-    currentWorkingDirectory?: string
+    currentWorkingDirectory?: string,
+    systemInfo?: string
   ): Promise<any> {
     this.logger.info(`Command was aborted, retrieving partial output`);
 
@@ -459,6 +460,11 @@ ${trimmedCommand}\n`);
       executionResults += `\ndirectory where command executed is ${currentWorkingDirectory}`;
     }
 
+    // Include system information if available
+    if (systemInfo) {
+      executionResults += `\nsystemInfo is ${systemInfo}`;
+    }
+
     // Build additional information section
     let additionalInfo = `outputId is ${outputId}`;
 
@@ -487,7 +493,8 @@ ${trimmedCommand}\n`);
     exitCode: number | null,
     session: any,
     executionStartTime: number,
-    pairProgrammingEnabled: boolean
+    pairProgrammingEnabled: boolean,
+    systemInfo?: string
   ): Promise<any> {
     // Store the output in the storage service
     const outputId = this.outputStorage.storeOutput({
@@ -556,7 +563,8 @@ ${trimmedCommand}\n`);
         `exitCode is ${exitCode ?? 0}\n` +
         `duration is ${duration} milliseconds\n` +
         `tabId is ${session.id}\n` +
-        `directory where command executed is ${currentWorkingDirectory}`
+        `directory where command executed is ${currentWorkingDirectory}` +
+        (systemInfo ? `\nsystemInfo is ${systemInfo}` : '')
       )
       .addCommandOutput(output);
 
@@ -585,7 +593,7 @@ ${trimmedCommand}\n`);
   getTool() {
     return {
       name: 'exec_command',
-      description: `Executes a shell command in a terminal session and returns organized sections with execution results, command output, and additional information when applicable.`,
+      description: `Executes a shell command in a terminal session and returns organized sections with execution results (including system information from uname -a), command output, and additional information when applicable.`,
       schema: {
         command: z.string().describe('The shell command to execute. Can be any valid shell command, script, or program that would normally run in a terminal. Examples: "ls -la", "cat /etc/hosts", "ps aux | grep node"'),
 

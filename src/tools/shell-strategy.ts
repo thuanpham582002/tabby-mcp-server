@@ -162,15 +162,15 @@ export class ShellContext {
     const shType = new ShShellStrategy().getShellType();
     const unknownType = new UnknownShellStrategy().getShellType();
 
-    return `if [ -n "$BASH_VERSION" ]; then echo "SHELL_TYPE=${bashType}"; elif [ -n "$ZSH_VERSION" ]; then echo "SHELL_TYPE=${zshType}"; elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then echo "SHELL_TYPE=${shType}"; else echo "SHELL_TYPE=${unknownType}"; fi; echo "PWD_PATH=$(pwd)"`;
+    return `if [ -n "$BASH_VERSION" ]; then echo "SHELL_TYPE=${bashType}"; elif [ -n "$ZSH_VERSION" ]; then echo "SHELL_TYPE=${zshType}"; elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then echo "SHELL_TYPE=${shType}"; else echo "SHELL_TYPE=${unknownType}"; fi; echo "PWD_PATH=$(pwd)"; if command -v uname >/dev/null 2>&1; then echo "SYSTEM_INFO=$(uname -a 2>/dev/null || echo 'System information unavailable')"; else echo "SYSTEM_INFO=System information unavailable"; fi`;
   }
 
   /**
-   * Detect shell type and current working directory from terminal output
-   * @param terminalOutput The terminal output containing shell type and pwd
-   * @returns Object with detected shell type and current working directory, or null if detection fails
+   * Detect shell type, current working directory, and system information from terminal output
+   * @param terminalOutput The terminal output containing shell type, pwd, and system info
+   * @returns Object with detected shell type, current working directory, and system information, or null if detection fails
    */
-  detectShellType(terminalOutput: string): { shellType: string; currentWorkingDirectory: string } | null {
+  detectShellType(terminalOutput: string): { shellType: string; currentWorkingDirectory: string; systemInfo?: string } | null {
     try {
       if (!terminalOutput || typeof terminalOutput !== 'string') {
         console.warn('[DEBUG] Invalid terminal output provided for shell detection');
@@ -186,9 +186,10 @@ export class ShellContext {
 
       let shellType: string | null = null;
       let currentWorkingDirectory: string | null = null;
+      let systemInfo: string | null = null;
 
-      // Check the last 5 lines for SHELL_TYPE= and PWD_PATH= patterns
-      for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
+      // Check the last 10 lines for SHELL_TYPE=, PWD_PATH=, and SYSTEM_INFO= patterns
+      for (let i = Math.max(0, lines.length - 10); i < lines.length; i++) {
         const line = lines[i];
         if (line && line.startsWith('SHELL_TYPE=')) {
           const parts = line.split('=');
@@ -202,11 +203,17 @@ export class ShellContext {
             currentWorkingDirectory = parts[1].trim();
             console.log(`[DEBUG] Raw detected pwd: "${currentWorkingDirectory}"`);
           }
+        } else if (line && line.startsWith('SYSTEM_INFO=')) {
+          const parts = line.split('=', 2); // Only split on first = to preserve spaces in system info
+          if (parts.length >= 2) {
+            systemInfo = parts[1].trim();
+            console.log(`[DEBUG] Raw detected system info: "${systemInfo}"`);
+          }
         }
       }
 
       if (shellType && currentWorkingDirectory) {
-        return { shellType, currentWorkingDirectory };
+        return { shellType, currentWorkingDirectory, systemInfo: systemInfo || undefined };
       }
 
       console.warn('[DEBUG] Missing SHELL_TYPE or PWD_PATH pattern in terminal output');
