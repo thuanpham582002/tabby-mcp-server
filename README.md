@@ -34,10 +34,8 @@ A [Tabby Terminal](https://github.com/Eugeny/tabby) plugin that exposes your act
   - [Claude Code](#claude-code)
   - [Codex / OpenAI Codex CLI](#codex--openai-codex-cli)
 - [Tools](#tools)
-- [HTTP Smoke Tests](#http-smoke-tests)
 - [Configuration](#configuration)
 - [Development](#development)
-- [Troubleshooting](#troubleshooting)
 - [License](#license)
 
 ## Requirements
@@ -178,73 +176,6 @@ For TOML-based configs, map the same SSE URL using your client's supported SSE M
 | `get_terminal_buffer` | Read terminal buffer content | `tabId`, `startLine`, `endLine` |
 | `get_command_output` | Retrieve full/paginated command output | `outputId`, `startLine`, `maxLines` |
 
-### Command execution notes
-
-`exec_command` uses a minimal marker protocol to detect command boundaries and exit code:
-
-```sh
-(
-printf '_<timestamp>\n'
-<command>
-printf '_<timestamp> %s\n' "$?"
-)
-```
-
-The response contains:
-
-```json
-{
-  "output": "command output",
-  "promptShell": "prompt text if detected",
-  "exitCode": 0,
-  "aborted": false,
-  "outputId": "cmd_...",
-  "message": ""
-}
-```
-
-Long output is truncated in the initial response and can be retrieved with `get_command_output`.
-
-## HTTP Smoke Tests
-
-Health:
-
-```bash
-curl http://localhost:3001/health
-```
-
-List sessions:
-
-```bash
-curl -X POST http://localhost:3001/api/tool/get_ssh_session_list \
-  -H 'Content-Type: application/json' \
-  -d '{}'
-```
-
-Run a successful command:
-
-```bash
-curl -X POST http://localhost:3001/api/tool/exec_command \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"printf hello; echo; pwd","tabId":"0"}'
-```
-
-Run a failing command:
-
-```bash
-curl -X POST http://localhost:3001/api/tool/exec_command \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"false","tabId":"0"}'
-```
-
-Test long output:
-
-```bash
-curl -X POST http://localhost:3001/api/tool/exec_command \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"seq 1 300","tabId":"0"}'
-```
-
 ## Configuration
 
 Default plugin configuration:
@@ -306,40 +237,6 @@ make build-dist            # Build dist only
 make build-dist-with-deps  # Build dist and copy node_modules
 make help                  # Show available targets
 ```
-
-## Troubleshooting
-
-### Tabby disables third-party plugins on startup
-
-Check the Tabby error message and rebuild/reinstall:
-
-```bash
-make build-dist
-bash scripts/copy_to_plugin_folder.sh
-```
-
-Then restart Tabby.
-
-### `get_ssh_session_list` returns `cb is not a function`
-
-This is caused by registering a no-argument MCP tool with an undefined schema. Current builds use an empty schema (`{}`) for no-argument tools.
-
-Update to the latest version and reinstall the plugin.
-
-### `curl http://localhost:3001/health` does not return `OK`
-
-- Confirm Tabby is running
-- Confirm the plugin is enabled
-- Check **Settings → Plugins → MCP** for the configured port
-- Check whether another process is using the port:
-
-```bash
-lsof -nP -iTCP:3001 -sTCP:LISTEN
-```
-
-### Docker build fails while downloading Electron
-
-The Dockerfile skips Electron binary download because the plugin build only needs Tabby's typings and build tooling, not a runnable Electron binary.
 
 ## License
 
