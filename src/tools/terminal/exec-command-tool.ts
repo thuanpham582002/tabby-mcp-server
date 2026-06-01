@@ -6,7 +6,6 @@ import { BaseTerminalTabComponentWithId, ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
 import { CommandHistoryManagerService } from '../../services/commandHistoryManager.service';
-import { escapeShellString } from '../../utils/escapeShellString';
 import { AppService, ConfigService } from 'tabby-core';
 import { DialogService } from '../../services/dialog.service';
 import { RunningCommandsManagerService } from '../../services/runningCommandsManager.service';
@@ -156,10 +155,13 @@ export class ExecCommandTool extends BaseTool {
         }
       }
 
-      // Generate unique markers for this command
+      // Generate unique markers for this command. Keep the marker protocol
+      // shell-agnostic: print a start marker, run the command, then print the
+      // end marker with the exit code on the same line.
       const timestamp = Date.now();
-      const startMarker = `_S${timestamp}`;
-      const endMarker = `_E${timestamp}`;
+      const marker = `_${timestamp}`;
+      const startMarker = marker;
+      const endMarker = marker;
       const executionStartTime = Date.now();
 
       // Track exit code
@@ -186,67 +188,20 @@ export class ExecCommandTool extends BaseTool {
       // Start tracking the command in running commands manager
       this.runningCommandsManager.startCommand(session.id.toString(), command);
 
-      // First determine which shell we're running in using read to hide commands
-      const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
-
       session.tab.sendInput('\x03');
       await new Promise(resolve => setTimeout(resolve, 100));
+
       const trimmedCommand = command.endsWith('\n') ? command.slice(0, -1) : command;
-      // First send a read command that will hide the detection script - more shell compatible approach
-      // Check if command contains newlines (multiple commands)
-      if (command.includes('\n')) {
-        // Send the command with typing simulation
-        session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo; {
-echo "${startMarker}"
+      // Keep the protocol simple, matching tmux-mcp: run a subshell and print
+      // a single end marker with `$?`. No shell hooks, prompt hooks, temp
+      // scripts, or cleanup variables.
+      const wrappedCommand = `(
+printf '${marker}\\n'
 ${trimmedCommand}
-}\n`);
-      } else {
-        // For single-line commands, use the simpler approach with proper semicolons
-        session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;echo "${startMarker}";\\
-${trimmedCommand}\n`);
-      }
+printf '${marker} %s\\n' "$?"
+)\n`;
 
-      // Send the detection script as input to the read command (will be hidden)
-      session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
-      
-      let attempts = 0;
-      const maxAttempts = 50;
-      let shellType: string | null = null;
-      
-      while (shellType === null && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Get terminal buffer to check shell type
-        const textAfterSetup = this.execToolCategory.getTerminalBufferText(session);
-        
-        // Determine shell type from output
-        shellType = this.execToolCategory.shellContext.detectShellType(textAfterSetup);
-        attempts++;
-        this.logger.info(`Shell type detection attempt ${attempts}: ${shellType}`);
-      }
-      
-      if (shellType === null) {
-        if (retryAttempt < this.MAX_RETRY_ATTEMPTS) {
-          this.logger.warn(`Failed to detect shell type after ${maxAttempts} attempts, retrying...`);
-          return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
-        } else {
-          this.logger.error(`Failed to detect shell type after ${maxAttempts} attempts, aborting command`);
-          await this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled); // Cancel command, do not return anything
-          return createJsonResponse({
-            output: `Command did not start after ${maxAttempts} attempts, aborting command, maybe it got error on escape sequence.`,
-            aborted: true,
-            exitCode: null
-          });
-        }
-      }
-
-      // Get the appropriate shell strategy
-      const shellStrategy = this.execToolCategory.shellContext.getStrategy(shellType ?? 'unknown');
-
-      // Get setup script and command prefix
-      const setupScript = shellStrategy.getSetupScript(startMarker, endMarker);
-
-      // Send the actual setup script (will be hidden by read)
-      session.tab.sendInput(`${escapeShellString(setupScript)}\n`);
+      session.tab.sendInput(wrappedCommand);
 
       // Wait for command output
       let output = '';
@@ -264,28 +219,28 @@ ${trimmedCommand}\n`);
         const lines = cleanTextAfter.split('\n');
 
         let promptIndex = -1;
-        // Find start and end markers
+        // Find the first standalone marker and the last marker carrying an exit
+        // code. This mirrors the tmux-mcp/atux-style "same marker appears at
+        // least twice" protocol without START/END labels.
         let startIndex = -1;
         let endIndex = -1;
 
-        for (let i = lines.length - 1; i >= 0; i--) {
-          if (lines[i].startsWith(startMarker)) {
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line === marker) {
             startIndex = i;
             commandStarted = true;
             for (let j = startIndex - 1; j >= 0; j--) {
-              if (lines[j].includes(startMarker)) {
+              if (lines[j].trim().length > 0) {
                 promptIndex = j;
                 break;
               }
             }
-            for (let j = startIndex + 1; j < lines.length; j++) {
-              if (lines[j].includes(endMarker)) {
-                endIndex = j;
-                commandFinished = true;
-                break;
-              }
-            }
-            break;
+          }
+
+          if (new RegExp(`^${marker}\\s+-?\\d+$`).test(line)) {
+            endIndex = i;
+            commandFinished = startIndex !== -1;
           }
         }
 
@@ -299,11 +254,18 @@ ${trimmedCommand}\n`);
           if (promptIndex !== -1) {
             promptShell = lines[promptIndex].trim();
           }
-          // Extract exit code if available
-          for (let i = endIndex; i < Math.min(endIndex + 5, lines.length); i++) {
-            if (lines[i].startsWith('exit_code:')) {
-              exitCode = parseInt(lines[i].split(':')[1].trim(), 10);
-              break;
+          // Extract exit code from the final marker line (`<marker> <code>`).
+          // Keep the old `exit_code:` parser as a fallback for older buffered output.
+          const endLine = (lines[endIndex] || '').trim();
+          const endMarkerMatch = endLine.match(new RegExp(`^${marker}\\s+(-?\\d+)$`));
+          if (endMarkerMatch) {
+            exitCode = parseInt(endMarkerMatch[1], 10);
+          } else {
+            for (let i = endIndex; i < Math.min(endIndex + 5, lines.length); i++) {
+              if (lines[i].startsWith('exit_code:')) {
+                exitCode = parseInt(lines[i].split(':')[1].trim(), 10);
+                break;
+              }
             }
           }
 

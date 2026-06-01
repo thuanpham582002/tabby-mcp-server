@@ -53,15 +53,16 @@ export class McpService {
     
     // Register all tools from the category
     category.mcpTools.forEach(tool => {
-      // For tools with empty schemas, we keep the schema as-is
-      // MCP SDK will handle it appropriately
+      const inputSchema = (tool.schema || {}) as z.ZodRawShape;
+
       this.server.tool(
         tool.name,
         tool.description,
-        tool.schema as z.ZodRawShape, 
-        tool.handler
+        inputSchema,
+        async (args, extra) => tool.handler(args, extra)
       );
-      this.logger.info(`Registered tool: ${tool.name} from category: ${category.name} with schema: ${JSON.stringify(tool.schema)}`);
+
+      this.logger.info(`Registered tool: ${tool.name} from category: ${category.name} with schema: ${JSON.stringify(inputSchema)}`);
     });
   }
 

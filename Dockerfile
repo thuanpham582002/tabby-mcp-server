@@ -18,7 +18,10 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install project dependencies
+# Install project dependencies. The Docker build only needs Tabby's JS
+# dependencies/typings, not a runnable Electron binary; skipping the Electron
+# binary download avoids flaky network failures during plugin builds.
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 RUN cd app && yarn && cd .. && yarn
 
 # Build typings and full application
