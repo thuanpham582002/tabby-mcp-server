@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-06-01
+
+### Changed
+- Promoted the plugin to the first stable release.
+- Refreshed README with production-focused setup, SSE client examples, smoke tests, and troubleshooting.
+- Simplified command boundary markers to a compact tmux-mcp-style protocol.
+
+### Fixed
+- Fixed no-argument MCP tool registration for `get_ssh_session_list`.
+- Pinned MCP/Zod dependencies for compatibility with Tabby's TypeScript build toolchain.
+- Made Docker builds more reliable by skipping unnecessary Electron binary downloads.
+
 ## [0.0.2] - 2025-06-27
 
 ### Added

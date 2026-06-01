@@ -31,7 +31,6 @@ A [Tabby Terminal](https://github.com/Eugeny/tabby) plugin that exposes your act
 - [Quick Start](#quick-start)
 - [Connecting MCP Clients](#connecting-mcp-clients)
   - [SSE clients](#sse-clients)
-  - [STDIO-only clients](#stdio-only-clients)
   - [Claude Code](#claude-code)
   - [Codex / OpenAI Codex CLI](#codex--openai-codex-cli)
 - [Tools](#tools)
@@ -46,7 +45,7 @@ A [Tabby Terminal](https://github.com/Eugeny/tabby) plugin that exposes your act
 - Tabby Terminal installed and running
 - Docker, for local builds
 - macOS for the provided install script path
-- An MCP-compatible client, such as Claude Code, Cursor, Windsurf, Codex, or any client that supports SSE/STDIO MCP servers
+- An MCP-compatible client with SSE support, such as Claude Code, Cursor, Windsurf, Codex, or another SSE-capable MCP client
 
 ## Installation
 
@@ -143,21 +142,6 @@ For Cursor-style clients, place it in the MCP config file, for example:
 ~/.cursor/mcp.json
 ```
 
-### STDIO-only clients
-
-Some clients only support STDIO MCP servers. Use the `tabby-mcp-stdio` bridge to connect STDIO to the running Tabby SSE server:
-
-```json
-{
-  "mcpServers": {
-    "tabby-mcp": {
-      "command": "npx",
-      "args": ["-y", "tabby-mcp-stdio", "--port", "3001"]
-    }
-  }
-}
-```
-
 ### Claude Code
 
 If your Claude Code version supports SSE MCP servers:
@@ -166,13 +150,11 @@ If your Claude Code version supports SSE MCP servers:
 claude mcp add --transport sse tabby-mcp http://localhost:3001/sse
 ```
 
-If your setup uses JSON config, use the [SSE clients](#sse-clients) configuration. If your setup only accepts STDIO servers, use the [STDIO-only clients](#stdio-only-clients) bridge.
+If your setup uses JSON config, use the [SSE clients](#sse-clients) configuration.
 
 ### Codex / OpenAI Codex CLI
 
-Use the transport supported by your Codex client.
-
-SSE-style JSON:
+Use the SSE MCP server configuration supported by your Codex client:
 
 ```json
 {
@@ -185,26 +167,7 @@ SSE-style JSON:
 }
 ```
 
-STDIO-style JSON:
-
-```json
-{
-  "mcpServers": {
-    "tabby-mcp": {
-      "command": "npx",
-      "args": ["-y", "tabby-mcp-stdio", "--port", "3001"]
-    }
-  }
-}
-```
-
-TOML-style config:
-
-```toml
-[mcp_servers.tabby-mcp]
-command = "npx"
-args = ["-y", "tabby-mcp-stdio", "--port", "3001"]
-```
+For TOML-based configs, map the same SSE URL using your client's supported SSE MCP syntax.
 
 ## Tools
 
