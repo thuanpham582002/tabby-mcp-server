@@ -25,6 +25,9 @@ export class McpService {
   private isRunning = false;
   private toolCategories: ToolCategory[] = [];
   private httpServer: http.Server;
+  // Interval for SSE keep-alive comments. Keeps idle proxies/NAT from reaping
+  // the stream and lets a failed write reveal a dead socket. See issue #8.
+  private readonly SSE_HEARTBEAT_INTERVAL_MS = 15000;
 
   constructor(
     public config: ConfigService,
@@ -87,14 +90,46 @@ export class McpService {
         "/messages",
         res as unknown as ServerResponse<IncomingMessage>,
       );
-      this.logger.info(`New SSE connection established for sessionId ${transport.sessionId}`);
+      const sessionId = transport.sessionId;
+      this.logger.info(`New SSE connection established for sessionId ${sessionId}`);
 
-      this.transports[transport.sessionId] = transport;
-      res.on("close", () => {
-        delete this.transports[transport.sessionId];
+      this.transports[sessionId] = transport;
+
+      let heartbeat: ReturnType<typeof setInterval> | undefined;
+      const cleanup = () => {
+        if (heartbeat) {
+          clearInterval(heartbeat);
+          heartbeat = undefined;
+        }
+        if (this.transports[sessionId]) {
+          delete this.transports[sessionId];
+          this.logger.info(`SSE connection closed for sessionId ${sessionId}`);
+        }
+      };
+
+      res.on("close", cleanup);
+      res.on("error", (err) => {
+        this.logger.error(`SSE connection error for sessionId ${sessionId}:`, err);
+        cleanup();
       });
 
+      // Connect first so the SDK writes the SSE headers and initial endpoint
+      // event before we emit any keep-alive comments.
       await this.server.connect(transport);
+
+      // Periodic SSE comment keeps the stream alive across idle gaps (e.g. while
+      // a long command runs) and surfaces a dead socket via a failed write,
+      // instead of silently writing a tool result into a closed connection.
+      heartbeat = setInterval(() => {
+        try {
+          if (!res.write(": ping\n\n") && (res.writableEnded || res.destroyed)) {
+            cleanup();
+          }
+        } catch (err) {
+          this.logger.error(`SSE heartbeat failed for sessionId ${sessionId}:`, err);
+          cleanup();
+        }
+      }, this.SSE_HEARTBEAT_INTERVAL_MS);
     });
 
     this.app.post("/messages", async (req: Request, res: Response) => {
