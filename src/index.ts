@@ -115,7 +115,10 @@ export default class McpModule {
 
             if (startOnBoot) {
                 this.logger.info('Starting MCP server (start on boot enabled)');
-                await this.mcpService.startServer(this.config.store.mcp.port);
+                await this.mcpService.startServer(
+                    this.config.store.mcp.port,
+                    this.config.store.mcp.listenHost || '127.0.0.1'
+                );
             } else {
                 this.logger.info('MCP server not starting automatically (start on boot disabled)');
             }

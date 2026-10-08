@@ -174,15 +174,15 @@ export class McpService {
   /**
    * Initialize the MCP service
    */
-  public initialize(port: number): Promise<void> {
+  public initialize(port: number, host = '127.0.0.1'): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         // Create and start the HTTP server
         const httpServer = http.createServer(this.app);
 
         // Start the server
-        httpServer.listen(port, () => {
-          this.logger.info(`[MCP Service] MCP server listening on port ${port}`);
+        httpServer.listen(port, host, () => {
+          this.logger.info(`[MCP Service] MCP server listening on ${host}:${port}`);
           this.isRunning = true;
           this.httpServer = httpServer;
           resolve();
@@ -206,8 +206,8 @@ export class McpService {
    * Start the MCP server
    * This is a convenience method for the UI
    */
-  public async startServer(port: number): Promise<void> {
-    return this.initialize(port);
+  public async startServer(port: number, host = '127.0.0.1'): Promise<void> {
+    return this.initialize(port, host);
   }
 
   /**
