@@ -14,6 +14,7 @@ export class McpConfigProvider extends ConfigProvider {
       startOnBoot: true,
       enabled: true,
       port: 3001,
+      listenHost: '127.0.0.1',
       serverUrl: 'http://localhost:3001',
       enableDebugLogging: true,
       pairProgrammingMode: {

@@ -19,6 +19,20 @@
     .text-muted The URL of the MCP server to connect to
 
   .form-group
+    label Listen Address
+    .d-flex
+      input.form-control.mr-2(
+        type='text',
+        [(ngModel)]='listenHost',
+      )
+      button.btn.btn-secondary(
+        (click)='saveListenHost()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted The address the MCP server listens on (use 0.0.0.0 to allow network connections)
+
+  .form-group
     label Port
     .d-flex
       input.form-control.mr-2(
